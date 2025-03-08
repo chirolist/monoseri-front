@@ -44,11 +44,5 @@ const routes = [
     path: 'sign-in',
     icon: <MdLock className="h-6 w-6" />,
   },
-  {
-    name: 'RTL Admin',
-    layout: '/rtl',
-    path: 'rtl-default',
-    icon: <MdHome className="h-6 w-6" />,
-  },
 ];
 export default routes;
