@@ -33,6 +33,12 @@ const routes = [
     path: 'data-tables',
   },
   {
+    name: '本',
+    layout: '/admin',
+    icon: <MdBarChart className="h-6 w-6" />,
+    path: 'book',
+  },
+  {
     name: 'Profile',
     layout: '/admin',
     path: 'profile',
