@@ -39,6 +39,12 @@ const routes = [
     path: 'book',
   },
   {
+    name: '請求書',
+    layout: '/admin',
+    icon: <MdBarChart className="h-6 w-6" />,
+    path: 'invoice',
+  },
+  {
     name: 'Profile',
     layout: '/admin',
     path: 'profile',
