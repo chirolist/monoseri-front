@@ -1,11 +1,11 @@
 # builder
-FROM public.ecr.aws/docker/library/node:18-slim AS builder
+FROM node:20-slim AS builder
 ENV TZ=Asia/Tokyo
 WORKDIR /app
 COPY . .
 RUN yarn install && yarn build
 # server
-FROM public.ecr.aws/docker/library/node:18-slim
+FROM node:20-slim
 ENV TZ=Asia/Tokyo
 WORKDIR /app
 COPY --from=builder \
