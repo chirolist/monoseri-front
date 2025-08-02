@@ -15,7 +15,6 @@ COPY --from=builder \
   /app/next.config.js \
   /app/tsconfig.json \
   ./
-COPY --from=builder /app/.yarn ./.yarn
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/env ./env
 COPY --from=builder /app/public ./public
