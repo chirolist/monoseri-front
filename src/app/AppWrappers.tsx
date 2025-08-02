@@ -9,7 +9,9 @@ import 'styles/index.css';
 
 import dynamic from 'next/dynamic';
 
-const _NoSSR = ({ children }) => <React.Fragment>{children}</React.Fragment>;
+const _NoSSR: React.FC<{ children: ReactNode }> = ({ children }) => (
+  <React.Fragment>{children}</React.Fragment>
+);
 
 const NoSSR = dynamic(() => Promise.resolve(_NoSSR), {
   ssr: false,
