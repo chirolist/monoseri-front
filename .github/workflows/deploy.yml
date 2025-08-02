@@ -1,48 +1,102 @@
 # This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
 
-name: Node.js CI
+name: Deploy
 
 on:
   push:
-    branches: [feature/live-preview]
-  pull_request:
-    branches: [feature/live-preview]
+    branches: main
+  workflow_dispatch:
+    inputs:
+      no-cache:
+        description: 'Build docker images with no cache'
+        default: false
+        required: false
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [18.x]
 
     steps:
-      - name: Set Actions Allow Unsecure Commands
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ap-northeast-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Login to Amazon ECR Public
+        id: login-ecr-public
+        uses: aws-actions/amazon-ecr-login@v2
+        env:
+          AWS_REGION: us-east-1
+        with:
+          registry-type: public
+
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ${{ steps.login-ecr.outputs.registry }}/monoseri-front-repository
+          tags: |
+            type=semver,pattern={{version}}
+            type=sha,format=long
+            type=schedule,pattern={{date 'YYYYMMDD-hhmmss'}}
+
+      - name: Build and push
+        id: app-build-image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/node/Dockerfile
+          push: true
+          no-cache: ${{ inputs.no-cache == true }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+            ${{ steps.login-ecr.outputs.registry }}/monoseri-front-repository:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Download task definition
         run: |
-          echo "ACTIONS_ALLOW_UNSECURE_COMMANDS=true" >> $GITHUB_ENV
+          aws ecs describe-task-definition \
+          --task-definition monoseri-front-task \
+          --query taskDefinition > ecs-task-definition.json
 
-      - uses: actions/checkout@v2
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
+      - name: Update task-definition parameters
+        run: >
+          cat ecs-task-definition.json | jq '.containerDefinitions=[.containerDefinitions[] |
+            select(.name=="monoseri-front-app").image="${{ steps.meta.outputs.tags }}"
+          ] |
+          del (.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities) |
+          .cpu="512" |
+          .memory="1024"' > task-definition.json
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
-          node-version: ${{ matrix.node-version }}
-
-      - name: Installing my packages
-        run: yarn install
-
-      - name: Build my App
-        run: yarn build
-        env:
-          NEXT_PUBLIC_BASE_PATH: /chakra-nextjs-pro
-      - run: yarn export
-        env:
-          NEXT_PUBLIC_BASE_PATH: /chakra-nextjs-pro
-      - run: touch ./out/.nojekyll
-
-      - name: Deploy 🚀
-        uses: JamesIves/github-pages-deploy-action@3.5.9
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: out
+          task-definition: task-definition.json
+          service: fargate-service
+          cluster: fargate-cluster
+          wait-for-service-stability: true
