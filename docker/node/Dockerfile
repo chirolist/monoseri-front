@@ -3,7 +3,7 @@ FROM public.ecr.aws/docker/library/node:22-slim AS builder
 ENV TZ=Asia/Tokyo
 WORKDIR /app
 COPY . .
-RUN yarn install && yarn build
+RUN yarn workspaces focus --all --production && yarn build
 # server
 FROM public.ecr.aws/docker/library/node:22-slim
 ENV TZ=Asia/Tokyo
@@ -19,6 +19,6 @@ COPY --from=builder /app/.yarn ./.yarn
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/env ./env
 COPY --from=builder /app/public ./public
-RUN yarn install
+RUN yarn workspaces focus --all --production
 EXPOSE 3000
 CMD ["/bin/sh", "-c", "yarn start"]
